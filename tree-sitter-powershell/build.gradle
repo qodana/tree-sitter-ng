@@ -4,3 +4,7 @@ tasks.named('downloadSource') {
 tasks.named('buildNative') {
     additionalIncludeDirs = [srcDir.dir("src")]
 }
+
+tasks.named('buildNativeStatic') {
+    additionalIncludeDirs = [srcDir.dir("src")]
+}

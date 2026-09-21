@@ -116,6 +116,13 @@ subprojects {
         dependsOn downloadSource, rootProject.downloadZig
     }
 
+    if (project.hasProperty('staticLib')) {
+        tasks.register('buildNativeStatic', BuildNativeStaticTask) {
+            zigExe = rootProject.downloadZig.zigExe
+            dependsOn downloadSource, rootProject.downloadZig
+        }
+    }
+
     tasks.withType(Javadoc) {
         options.locale = 'en_US'
         options.JFlags = ["-Duser.language=en_US"]
