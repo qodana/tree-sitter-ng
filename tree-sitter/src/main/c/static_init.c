@@ -10,6 +10,11 @@
  * Ordinary Java_* symbols do resolve for statically linked libraries, so this exposes one
  * and calls JNI_OnLoad from it. Called once from NativeUtils.loadLib, after
  * System.loadLibrary has registered the builtin library.
+ *
+ * BuildNativeStaticTask compiles this file and org_treesitter_TSParser.c with
+ * -DJNI_OnLoad=<lib>_jni_on_load, because every statically linked JNI library defines that
+ * symbol and a binary that links two of them would not. The declaration below is renamed
+ * along with the definition, so this call still resolves.
  */
 
 #include <jni.h>

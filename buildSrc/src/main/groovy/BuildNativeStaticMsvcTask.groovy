@@ -67,6 +67,19 @@ class BuildNativeStaticMsvcTask extends DefaultTask {
         return project.layout.buildDirectory.dir("static-libs").get()
     }
 
+    /**
+     * Every statically linked JNI library defines JNI_OnLoad, and a consumer that links
+     * more than one of them into a single binary - chatter links sqlite-jdbc's too - gets
+     * a duplicate symbol at link time. Nothing calls it by that name here: GraalVM does
+     * not invoke JNI_OnLoad for a third-party library, which is why static_init.c calls it
+     * directly, and static_init.c is compiled with this same define. So renaming it is
+     * both safe and the cheapest fix.
+     */
+    @Input
+    String getOnLoadSymbol() {
+        return "${libName.replace('-', '_')}_jni_on_load"
+    }
+
     BuildNativeStaticMsvcTask() {
         description = "Build parser static archives with MSVC"
         group = "build"
@@ -94,7 +107,8 @@ class BuildNativeStaticMsvcTask extends DefaultTask {
         sources.each { source ->
             def object = new File(objDir, "${source.name}.obj")
             objects.add(object)
-            def cmd = ["cl.exe", "/nologo", "/c", "/O2", "/MD"]
+            def cmd = ["cl.exe", "/nologo", "/c", "/O2", "/MD",
+                       "/DJNI_OnLoad=${onLoadSymbol}".toString()]
             cmd.addAll(includes)
             cmd.addAll([source, "/Fo$object"])
             project.exec { workingDir jniCDir; commandLine(cmd) }

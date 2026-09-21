@@ -86,6 +86,19 @@ class BuildNativeStaticTask extends DefaultTask {
         return target.replaceFirst(/\.\d+(\.\d+)*$/, "")
     }
 
+    /**
+     * Every statically linked JNI library defines JNI_OnLoad, and a consumer that links
+     * more than one of them into a single binary - chatter links sqlite-jdbc's too - gets
+     * a duplicate symbol at link time. Nothing calls it by that name here: GraalVM does
+     * not invoke JNI_OnLoad for a third-party library, which is why static_init.c calls it
+     * directly, and static_init.c is compiled with this same define. So renaming it is
+     * both safe and the cheapest fix.
+     */
+    @Input
+    String getOnLoadSymbol() {
+        return "${libName.replace('-', '_')}_jni_on_load"
+    }
+
     BuildNativeStaticTask() {
         description = "Build parser static archives"
         group = "build"
@@ -118,7 +131,7 @@ class BuildNativeStaticTask extends DefaultTask {
                 // zig picks the language from the extension, so `.c` is compiled as C even
                 // under `c++` - which is what the JNI glue needs, it does not compile as C++.
                 def cmd = [zigExe, "c++", "-g0", "-fno-sanitize=undefined", "-c",
-                           "-target", target]
+                           "-target", target, "-DJNI_OnLoad=${onLoadSymbol}".toString()]
                 cmd.addAll(includes)
                 cmd.addAll([source, "-o", object])
                 project.exec { workingDir jniCDir; commandLine(cmd) }
