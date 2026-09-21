@@ -6,6 +6,10 @@
 name: Static libraries
 
 on:
+  # On a pull request the archives are built but not attached to anything: this is the only
+  # way the MSVC leg gets exercised before a release depends on it, and workflow_dispatch
+  # is not available until the workflow reaches the default branch.
+  pull_request:
   release:
     types: [published]
   workflow_dispatch:
@@ -90,6 +94,7 @@ jobs:
   attach:
     name: Attach the asset
     needs: [unix, windows]
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-22.04
     permissions:
       contents: write
