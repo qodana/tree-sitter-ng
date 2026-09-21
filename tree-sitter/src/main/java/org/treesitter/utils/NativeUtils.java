@@ -11,6 +11,18 @@ import java.util.Set;
 
 public abstract class NativeUtils {
     private static final Set<String> loadedLibs = new HashSet<>();
+
+    /** Set by the native image runtime and absent on the JVM. Read as a property so that
+     *  this module keeps no compile-time dependency on any GraalVM artifact. */
+    private static final String IMAGE_CODE_PROPERTY = "org.graalvm.nativeimage.imagecode";
+
+    /** The only library whose JNI_OnLoad does anything worth driving. */
+    private static final String CORE_LIB_NAME = "tree-sitter";
+
+    private static final int JNI_VERSION_1_2 = 0x00010002;
+
+    /** Implemented by static_init.c. Resolvable only in a native image. */
+    private static native int initNative();
     private static String getFullLibName(String libName){
         String osName = System.getProperty("os.name").toLowerCase();
         String archName = System.getProperty("os.arch").toLowerCase();
@@ -115,8 +127,37 @@ public abstract class NativeUtils {
         if (loadedLibs.contains(libName)) {
             return;
         }
-        Path path = libFile(libName);
-        System.load(path.toAbsolutePath().toString());
+        if (System.getProperty(IMAGE_CODE_PROPERTY) != null) {
+            loadStatic(libName);
+        } else {
+            Path path = libFile(libName);
+            System.load(path.toAbsolutePath().toString());
+        }
         loadedLibs.add(libName);
+    }
+
+    /**
+     * Resolves the library inside a native image, where it is a static archive linked into
+     * the binary rather than a file to extract. Only System.loadLibrary finds a builtin
+     * library, and GraalVM never calls JNI_OnLoad for a third-party one, so the core
+     * library's initializer - which caches the JavaVM that ts_log needs - is driven
+     * explicitly through initNative.
+     */
+    private static void loadStatic(String libName) {
+        String simpleName = simpleLibName(libName);
+        System.loadLibrary(simpleName);
+        if (CORE_LIB_NAME.equals(simpleName)) {
+            int version = initNative();
+            if (version < JNI_VERSION_1_2) {
+                throw new UnsatisfiedLinkError(
+                        "tree-sitter JNI_OnLoad returned " + version
+                                + ", so the JavaVM it caches is unset and any parser logger would crash");
+            }
+        }
+    }
+
+    /** The library name System.loadLibrary takes, from the resource-style name loadLib takes. */
+    static String simpleLibName(String libName) {
+        return libName.substring(libName.lastIndexOf('/') + 1);
     }
 }
