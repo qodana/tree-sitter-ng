@@ -11,6 +11,10 @@
  * and calls JNI_OnLoad from it. Called once from NativeUtils.loadLib, after
  * System.loadLibrary has registered the builtin library.
  *
+ * It lives outside src/main/c on purpose: BuildNativeTask compiles everything it finds
+ * there into the shared library, where JNI_OnLoad is called normally and this entry point
+ * would be dead weight. Only the static build pulls it in, through additionalCFiles.
+ *
  * BuildNativeStaticTask compiles this file and org_treesitter_TSParser.c with
  * -DJNI_OnLoad=<lib>_jni_on_load, because every statically linked JNI library defines that
  * symbol and a binary that links two of them would not. The declaration below is renamed
