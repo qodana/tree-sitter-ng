@@ -1,0 +1,132 @@
+# Builds the static archives and attaches them to the release for a tag.
+#
+# JitPack packages this asset rather than compiling C itself, so the ordering is: push the
+# tag, let this run to completion, then let anything request the artifact from JitPack -
+# it caches a failed build, and unpicking that needs their UI.
+name: Static libraries
+
+on:
+  # On a pull request the archives are built but not attached to anything: this is the only
+  # way the MSVC leg gets exercised before a release depends on it, and workflow_dispatch
+  # is not available until the workflow reaches the default branch.
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build and attach the asset to
+        required: true
+
+env:
+  MODULES: tree-sitter tree-sitter-bash tree-sitter-batch tree-sitter-javascript tree-sitter-powershell tree-sitter-python
+
+jobs:
+  unix:
+    name: macOS and Linux archives
+    # zig pins the glibc version per target, but the runner still decides which Gradle and
+    # JDK build the tasks around it.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+      - uses: gradle/actions/setup-gradle@v4.2.1
+      - name: Build archives
+        run: |
+          set -euo pipefail
+          tasks=""
+          for m in $MODULES; do tasks="$tasks :$m:buildNativeStatic"; done
+          ./gradlew --stacktrace $tasks
+      - name: Stage them
+        run: |
+          set -euo pipefail
+          for m in $MODULES; do
+            mkdir -p "dist/$m"
+            cp -R "$m/build/static-libs" "dist/$m/lib"
+          done
+          find dist -name '*.a' | sort
+      - uses: actions/upload-artifact@v4
+        with:
+          name: static-libs-unix
+          path: dist/
+
+  windows:
+    name: Windows archives
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'corretto'
+      - uses: gradle/actions/setup-gradle@v4.2.1
+      # cl.exe and lib.exe are not on PATH by default; this puts them there for the steps
+      # that follow.
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          tasks=""
+          for m in $MODULES; do tasks="$tasks :$m:buildNativeStaticMsvc"; done
+          ./gradlew --stacktrace $tasks
+      - name: Stage them
+        shell: bash
+        run: |
+          set -euo pipefail
+          for m in $MODULES; do
+            mkdir -p "dist/$m"
+            cp -R "$m/build/static-libs" "dist/$m/lib"
+          done
+          find dist -name '*.lib' | sort
+      - uses: actions/upload-artifact@v4
+        with:
+          name: static-libs-windows
+          path: dist/
+
+  attach:
+    name: Attach the asset
+    needs: [unix, windows]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: static-libs-unix
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: static-libs-windows
+          path: dist
+      - name: Check every module has every target
+        run: |
+          set -euo pipefail
+          expected="aarch64-macos x86_64-macos aarch64-linux-gnu x86_64-linux-gnu x86_64-windows"
+          status=0
+          for m in $MODULES; do
+            for t in $expected; do
+              if ! ls dist/$m/lib/$t/* >/dev/null 2>&1; then
+                echo "Missing $t archive for $m" >&2
+                status=1
+              fi
+            done
+          done
+          exit $status
+      - name: Zip and upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          (cd dist && zip -qr "../tree-sitter-ng-static-$TAG.zip" .)
+          gh release upload "$TAG" "tree-sitter-ng-static-$TAG.zip" \
+              --repo "${{ github.repository }}" --clobber

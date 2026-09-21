@@ -87,6 +87,29 @@ subprojects {
         }
     }
 
+    if (project.hasProperty('staticLib')) {
+        // Packed from what fetch-static-libs.sh unpacked, not from a local build: JitPack
+        // never compiles C, and a developer publishing locally is not who ships this.
+        def staticLibsDir = rootProject.layout.buildDirectory
+                .dir("static-libs-dist/${project.name}")
+        def staticLibsJar = tasks.register('staticLibsJar', Jar) {
+            archiveClassifier = 'static'
+            from(staticLibsDir)
+            doFirst {
+                def dir = staticLibsDir.get().asFile
+                def archives = dir.isDirectory() ? project.fileTree(dir).files : []
+                if (archives.isEmpty()) {
+                    throw new GradleException(
+                            "No static archives under $dir. Run scripts/fetch-static-libs.sh <tag> " +
+                            "first, or drop staticLib=true from ${project.name}/gradle.properties.")
+                }
+            }
+        }
+        publishing.publications.named('maven').configure {
+            artifact(staticLibsJar)
+        }
+    }
+
     signing {
         if (project.hasProperty('signing.keyId')) {
             sign configurations.archives
@@ -114,6 +137,16 @@ subprojects {
     tasks.register('buildNative', BuildNativeTask) {
         zigExe = rootProject.downloadZig.zigExe
         dependsOn downloadSource, rootProject.downloadZig
+    }
+
+    if (project.hasProperty('staticLib')) {
+        tasks.register('buildNativeStatic', BuildNativeStaticTask) {
+            zigExe = rootProject.downloadZig.zigExe
+            dependsOn downloadSource, rootProject.downloadZig
+        }
+        tasks.register('buildNativeStaticMsvc', BuildNativeStaticMsvcTask) {
+            dependsOn downloadSource
+        }
     }
 
     tasks.withType(Javadoc) {

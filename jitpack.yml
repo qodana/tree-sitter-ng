@@ -2,7 +2,11 @@ jdk:
   - openjdk17
 
 before_install:
-  - chmod +x gradlew
+  - chmod +x gradlew scripts/fetch-static-libs.sh
+  # The static archives are built by .github/workflows/static-libs.yml and attached to the
+  # release for this tag. Push the tag, wait for that workflow, and only then let anything
+  # request the artifact - JitPack caches a failed build.
+  - ./scripts/fetch-static-libs.sh "$VERSION"
 
 install:
   - ./gradlew -x test -x downloadSource -x buildNative publishToMavenLocal

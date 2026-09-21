@@ -12,3 +12,15 @@ tasks.named('buildNative') {
     additionalCFiles = downloadSource.srcDir.files("lib/src/lib.c")
     additionalIncludeDirs = [downloadSource.srcDir.dir("lib/src")]
 }
+
+tasks.named('buildNativeStatic') {
+    additionalCFiles = downloadSource.srcDir.files("lib/src/lib.c") +
+            files("src/main/c-static/static_init.c")
+    additionalIncludeDirs = [downloadSource.srcDir.dir("lib/src")]
+}
+
+tasks.named('buildNativeStaticMsvc') {
+    additionalCFiles = downloadSource.srcDir.files("lib/src/lib.c") +
+            files("src/main/c-static/static_init.c")
+    additionalIncludeDirs = [downloadSource.srcDir.dir("lib/src")]
+}
