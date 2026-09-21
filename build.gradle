@@ -121,6 +121,9 @@ subprojects {
             zigExe = rootProject.downloadZig.zigExe
             dependsOn downloadSource, rootProject.downloadZig
         }
+        tasks.register('buildNativeStaticMsvc', BuildNativeStaticMsvcTask) {
+            dependsOn downloadSource
+        }
     }
 
     tasks.withType(Javadoc) {
