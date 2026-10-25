@@ -72,7 +72,7 @@ This is a Java binding for [Tree Sitter](https://github.com/tree-sitter/tree-sit
 
 ### Supported Platforms
 - x86_64 Windows/macOS/Linux
-- aarch64 macOS/Linux
+- aarch64 Windows/macOS/Linux
 
 ### Language parser versioning
 - Only contains official tree sitter parser.
