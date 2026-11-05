@@ -46,6 +46,36 @@ class TSNodeTest {
     }
 
     @Test
+    void exportMatchesACursorWalk() {
+        TSNode root = parser.parseString(null, "{\"a\": [1, {\"b\": null}], \"c\": \"d\"}").getRootNode();
+        int[] exported = root.export();
+        TSTreeCursor cursor = new TSTreeCursor(root);
+        int i = 0;
+        while (true) {
+            TSNode node = cursor.currentNode();
+            assertEquals(node.getSymbol(), exported[i], "symbol at " + i);
+            assertEquals(node.isNamed() ? 1 : 0, exported[i + 1], "named at " + i);
+            assertEquals(node.getStartByte(), exported[i + 2], "start at " + i);
+            assertEquals(node.getEndByte(), exported[i + 3], "end at " + i);
+            assertEquals(cursor.currentFieldId(), exported[i + 4], "field at " + i);
+            assertEquals(node.getChildCount(), exported[i + 5], "children at " + i);
+            i += TSNode.EXPORT_STRIDE;
+            if (cursor.gotoFirstChild() || cursor.gotoNextSibling()) continue;
+            boolean next = false;
+            while (cursor.gotoParent()) {
+                if (cursor.gotoNextSibling()) { next = true; break; }
+            }
+            if (!next) break;
+        }
+        assertEquals(exported.length, i, "one record a node, no more");
+    }
+
+    @Test
+    void exportOfALeafIsOneRecord() {
+        assertArrayEquals(new int[]{numberNode.getSymbol(), 1, 1, 2, 0, 0}, numberNode.export());
+    }
+
+    @Test
     void getSymbol() {
         assertEquals("array", arrayNode.getType());
     }

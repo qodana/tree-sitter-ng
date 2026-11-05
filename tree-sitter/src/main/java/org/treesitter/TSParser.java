@@ -53,6 +53,7 @@ public class TSParser implements AutoCloseable {
     protected static native TSRange[] ts_tree_get_changed_ranges(long old_tree_ptr, long new_tree_ptr);
     protected static native String ts_node_type(TSNode node);
     protected static native int ts_node_symbol(TSNode node);
+    protected static native int[] ts_node_export(TSNode node);
     protected static native String ts_node_grammar_type(TSNode node);
     protected static native int ts_node_grammar_symbol(TSNode node);
     protected static native int ts_node_start_byte(TSNode node);
