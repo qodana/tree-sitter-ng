@@ -130,7 +130,8 @@ class BuildNativeStaticTask extends DefaultTask {
                 objects.add(object)
                 // zig picks the language from the extension, so `.c` is compiled as C even
                 // under `c++` - which is what the JNI glue needs, it does not compile as C++.
-                def cmd = [zigExe, "c++", "-g0", "-fno-sanitize=undefined", "-c",
+                // -O2 as the MSVC leg's /O2; without it zig's clang compiles at -O0.
+                def cmd = [zigExe, "c++", "-O2", "-g0", "-fno-sanitize=undefined", "-c",
                            "-target", target, "-DJNI_OnLoad=${onLoadSymbol}".toString()]
                 cmd.addAll(includes)
                 cmd.addAll([source, "-o", object])

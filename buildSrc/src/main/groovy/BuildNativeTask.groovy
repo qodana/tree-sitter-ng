@@ -162,6 +162,8 @@ class BuildNativeTask extends DefaultTask{
 
             def cmd = [
                     zigExe, "c++",
+                    // Without it zig's clang compiles at -O0: tree-sitter parsed ~2.7x slower.
+                    "-O2",
                     "-g0",
                     "-fno-sanitize=undefined",
                     "-shared",
