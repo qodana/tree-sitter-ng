@@ -86,6 +86,23 @@ public class TSNode {
         return ts_node_symbol(this);
     }
 
+    /** The ints {@link #export()} gives each node. */
+    public static final int EXPORT_STRIDE = 6;
+
+    /**
+     * This node and everything below it in one native call, for a caller that copies the tree: reading it node by
+     * node costs about ten JNI calls a node. Pre-order, {@value #EXPORT_STRIDE} ints a node: the symbol
+     * ({@link #getSymbol()}), 1 when named, the start byte, the end byte, the field id in its parent (0 for none, as
+     * {@link TSTreeCursor#currentFieldId()}) and the child count ({@link #getChildCount()}). The children of a node
+     * follow it, each with its own subtree, so the child counts are enough to rebuild the tree.
+     *
+     * @return The node's subtree, {@value #EXPORT_STRIDE} ints a node.
+     */
+    public int[] export(){
+        asserNotNull();
+        return ts_node_export(this);
+    }
+
     /**
      * Check if the node is null. Functions like {@link #getChild(int) getChild()} and
      * {@link #getNextSibling()} will return a null node to indicate that no such node

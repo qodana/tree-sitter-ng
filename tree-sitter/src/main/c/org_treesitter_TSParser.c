@@ -2051,3 +2051,47 @@ JNIEXPORT jlong JNICALL Java_org_treesitter_TSParser_ts_1load_1lang
     const TSLanguage *ts_lang = lang_fn();
     return (jlong) ts_lang;
 }
+/*
+ * The subtree of a node in one call: what a binding that copies a tree would otherwise read with ~10 JNI calls a
+ * node. Pre-order, 6 ints a node: symbol, is_named, start_byte, end_byte, field_id (0 for none), child_count.
+ * NULL (an OutOfMemoryError is pending) when the buffer cannot grow.
+ */
+JNIEXPORT jintArray JNICALL Java_org_treesitter_TSParser_ts_1node_1export
+  (JNIEnv *env, jclass clz, jobject ts_node_object){
+    TSNode root = ts_node_from_obj(env, ts_node_object);
+    TSTreeCursor cursor = ts_tree_cursor_new(root);
+    size_t cap = 6 * 1024, n = 0;
+    jint *buf = malloc(cap * sizeof(jint));
+    jintArray out = NULL;
+    if (buf == NULL) goto oom;
+    for (;;) {
+        TSNode node = ts_tree_cursor_current_node(&cursor);
+        if (n + 6 > cap) {
+            jint *grown = realloc(buf, 2 * cap * sizeof(jint));
+            if (grown == NULL) goto oom;
+            buf = grown;
+            cap *= 2;
+        }
+        buf[n++] = ts_node_symbol(node);
+        buf[n++] = ts_node_is_named(node);
+        buf[n++] = (jint) ts_node_start_byte(node);
+        buf[n++] = (jint) ts_node_end_byte(node);
+        buf[n++] = ts_tree_cursor_current_field_id(&cursor);
+        buf[n++] = (jint) ts_node_child_count(node);
+        if (ts_tree_cursor_goto_first_child(&cursor)) continue;
+        while (!ts_tree_cursor_goto_next_sibling(&cursor)) {
+            if (!ts_tree_cursor_goto_parent(&cursor)) goto done;
+        }
+    }
+done:
+    out = (*env)->NewIntArray(env, (jsize) n);
+    if (out != NULL) (*env)->SetIntArrayRegion(env, out, 0, (jsize) n, buf);
+    free(buf);
+    ts_tree_cursor_delete(&cursor);
+    return out;
+oom:
+    free(buf);
+    ts_tree_cursor_delete(&cursor);
+    (*env)->ThrowNew(env, (*env)->FindClass(env, "java/lang/OutOfMemoryError"), "ts_node_export");
+    return NULL;
+}
